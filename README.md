@@ -1,5 +1,8 @@
 # 🦞 NemoClaw Autonomous Software Factory
 
+![Dashboard screenshot](software-factory-ui.png)
+
+
 **A four-agent AI pipeline that takes a plain-English specification and autonomously produces a working city infrastructure health dashboard — entirely on-premises.**
 
 Built on [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw) + [HP ZGX Nano AI Station](https://www.hp.com/us-en/workstations/zgx.html). No cloud. No human intervention. A prompt goes in, a working application comes out.

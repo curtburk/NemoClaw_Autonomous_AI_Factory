@@ -1,0 +1,32 @@
+Output ONLY a verdict. Start with VERDICT: — nothing before it.
+
+Review this code against THESE FIVE checks ONLY. Ignore the implementation plan — use THESE criteria:
+
+1. Are ALL THREE endpoints present: /api/health, /api/sensors, /api/anomalies?
+2. Do all three endpoints have return statements that return data (not pass, not None)?
+3. Is CORS enabled?
+4. Does the script end with uvicorn.run on 0.0.0.0 port 8000?
+5. Any syntax errors, missing imports, or undefined variables?
+
+DO NOT check data ranges, response schemas, or anomaly values. Only check the 5 items above.
+
+CODE TO REVIEW:
+{code}
+
+Format — use EXACTLY one of these:
+
+VERDICT: APPROVE
+ISSUES:
+- None
+
+or
+
+VERDICT: REVISE
+ISSUES:
+- (one per line)
+REVISED CODE:
+```python
+(complete corrected script)
+```
+
+Start with VERDICT:

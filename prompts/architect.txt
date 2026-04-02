@@ -1,0 +1,57 @@
+Output ONLY the implementation plan below. No explanation. No commentary. No deviation from the values specified. Copy the exact numbers given — do NOT substitute your own values.
+
+SPECIFICATION:
+{spec}
+
+Output this EXACT plan with NO modifications to any numbers or units:
+
+## 1. DATA SCHEMA
+
+6 districts: district_1 through district_6. Each has 3 systems with these EXACT fields and ranges:
+
+Power grid:
+- voltage: float, range 115-125 V (NOT 220-240, NOT European voltage)
+- load_pct: float, range 30-85 percent
+- outage: boolean, default false
+
+Water network:
+- pressure_psi: float, range 45-80 PSI
+- flow_rate: float, range 5-15 GPM
+- quality_index: integer, range 85-100
+
+Traffic:
+- congestion_index: float, range 0.1-0.5
+- incident_count: integer, range 0-2
+- avg_speed_mph: float, range 25-45 MPH (NOT km/h)
+
+Each reading includes: district name, system name, sensor values, status (healthy/warning/critical).
+
+## 2. ANOMALIES
+
+Three ALWAYS-ACTIVE anomalies. NOT probabilistic. NOT 10% chance. ALWAYS present on every single API call:
+- district_3 power: voltage = 90-98 V (normal is 115-125 V), status = warning
+- district_5 water: pressure_psi = 20-30 PSI (normal is 45-80 PSI), status = critical
+- district_1 traffic: congestion_index = 0.85-0.95, avg_speed_mph = 5-12, incident_count = 3-5, status = critical
+
+## 3. DATA GENERATOR
+
+On each API call, generate fresh readings for all 6 districts x 3 systems:
+- Loop over districts. For each, generate power, water, traffic dicts using random.uniform() within the ranges above.
+- For anomaly districts, override specific fields with anomaly range values.
+- Anomalies are ALWAYS active. No probability. No time intervals. Every call returns anomaly values for those three districts.
+- Status: critical if value outside normal range, warning if borderline, healthy if normal.
+
+## 4. ENDPOINTS
+
+GET /api/health
+Returns: {{"overall": "critical", "districts": {{"district_1": {{"power": "healthy", "water": "healthy", "traffic": "critical"}}, ...}}}}
+
+GET /api/sensors
+Returns: {{"district_1": {{"power": {{"voltage": 120.1, "load_pct": 45.2, "outage": false, "status": "healthy"}}, "water": {{...}}, "traffic": {{...}}}}, ...}}
+
+GET /api/anomalies
+Returns: {{"anomalies": [{{"district": "district_3", "system": "power", "field": "voltage", "current_value": 94.2, "normal_range": "115-125V", "severity": "warning"}}, ...]}}
+
+## 5. FILE STRUCTURE
+
+Single file: generated_app.py

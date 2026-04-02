@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>City Infrastructure Health Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0f1e; --card: #111827; --border: #1e293b;
+    --text: #e0e6ed; --dim: #64748b; --muted: #475569;
+    --power: #00d4ff; --water: #00ffcc; --traffic: #ffaa00;
+    --critical: #ff3333; --warning: #fbbf24; --healthy: #34d399;
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; padding: 20px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .header-left h1 span { color: var(--power); }
+  .overall-badge { font-size: 14px; font-weight: 700; padding: 6px 16px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .overall-badge.healthy { background: rgba(52,211,153,0.15); color: var(--healthy); border: 1px solid rgba(52,211,153,0.3); }
+  .overall-badge.warning { background: rgba(251,191,36,0.15); color: var(--warning); border: 1px solid rgba(251,191,36,0.3); }
+  .overall-badge.critical { background: rgba(255,51,51,0.15); color: var(--critical); border: 1px solid rgba(255,51,51,0.3); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+  .timestamp { font-size: 12px; color: var(--dim); margin-top: 4px; font-family: monospace; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .card.critical-card { border-color: rgba(255,51,51,0.4); box-shadow: 0 0 15px rgba(255,51,51,0.1); animation: pulse 2s infinite; }
+  .card-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text); }
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.healthy { background: var(--healthy); }
+  .status-dot.warning { background: var(--warning); box-shadow: 0 0 6px rgba(251,191,36,0.5); }
+  .status-dot.critical { background: var(--critical); box-shadow: 0 0 8px rgba(255,51,51,0.6); animation: pulse 1s infinite; }
+  .sys-label { color: var(--dim); min-width: 50px; }
+  .sys-label.power { color: var(--power); }
+  .sys-label.water { color: var(--water); }
+  .sys-label.traffic { color: var(--traffic); }
+  .charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .chart-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+  .chart-title.power { color: var(--power); }
+  .chart-title.water { color: var(--water); }
+  .chart-title.traffic { color: var(--traffic); }
+  .alerts { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .alerts h2 { font-size: 14px; margin-bottom: 12px; color: var(--critical); }
+  .alert-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 6px; margin-bottom: 6px; background: rgba(255,51,51,0.04); border: 1px solid rgba(255,51,51,0.1); font-size: 12px; }
+  .alert-severity { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; }
+  .alert-severity.critical { background: rgba(255,51,51,0.2); color: var(--critical); }
+  .alert-severity.warning { background: rgba(251,191,36,0.2); color: var(--warning); }
+  .alert-detail { color: var(--dim); font-family: monospace; font-size: 11px; }
+  canvas { max-height: 200px; }
+  @media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, 1fr); } .charts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1><span>City Infrastructure</span> Health Monitor</h1>
+    <div class="timestamp" id="ts">Last updated: --</div>
+  </div>
+  <div id="overall-badge" class="overall-badge">--</div>
+</div>
+
+<div class="grid" id="district-grid"></div>
+
+<div class="charts">
+  <div class="chart-card">
+    <div class="chart-title power">⚡ Power Grid — Voltage (V)</div>
+    <canvas id="chart-power"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title water">💧 Water Network — Pressure (PSI)</div>
+    <canvas id="chart-water"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title traffic">🚗 Traffic — Congestion Index</div>
+    <canvas id="chart-traffic"></canvas>
+  </div>
+</div>
+
+<div class="alerts">
+  <h2>⚠ Active Anomaly Alerts</h2>
+  <div id="alert-list"></div>
+</div>
+
+<script>
+const DISTRICTS = ['district_1','district_2','district_3','district_4','district_5','district_6'];
+const MAX_POINTS = 10;
+
+function rand(min, max) { return +(Math.random() * (max - min) + min).toFixed(1); }
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+function generateSensors() {
+  const data = {};
+  for (const d of DISTRICTS) {
+    let power, water, traffic;
+    if (d === 'district_3') {
+      power = { voltage: rand(90,98), load_pct: rand(30,85), outage: false, status: 'warning' };
+    } else {
+      power = { voltage: rand(115,125), load_pct: rand(30,85), outage: false, status: 'healthy' };
+    }
+    if (d === 'district_5') {
+      water = { pressure_psi: rand(20,30), flow_rate: rand(5,15), quality_index: randInt(85,100), status: 'critical' };
+    } else {
+      water = { pressure_psi: rand(45,80), flow_rate: rand(5,15), quality_index: randInt(85,100), status: 'healthy' };
+    }
+    if (d === 'district_1') {
+      traffic = { congestion_index: rand(0.85,0.95), incident_count: randInt(3,5), avg_speed_mph: rand(5,12), status: 'critical' };
+    } else {
+      traffic = { congestion_index: rand(0.1,0.5), incident_count: randInt(0,2), avg_speed_mph: rand(25,45), status: 'healthy' };
+    }
+    data[d] = { power, water, traffic };
+  }
+  return data;
+}
+
+function getOverall(sensors) {
+  let overall = 'healthy';
+  for (const d of DISTRICTS) {
+    for (const sys of ['power','water','traffic']) {
+      const s = sensors[d][sys].status;
+      if (s === 'critical') return 'critical';
+      if (s === 'warning') overall = 'warning';
+    }
+  }
+  return overall;
+}
+
+function getAnomalies(sensors) {
+  return [
+    { district: 'district_3', system: 'power', field: 'voltage', value: sensors.district_3.power.voltage, range: '115-125V', severity: 'warning' },
+    { district: 'district_5', system: 'water', field: 'pressure_psi', value: sensors.district_5.water.pressure_psi, range: '45-80 PSI', severity: 'critical' },
+    { district: 'district_1', system: 'traffic', field: 'congestion_index', value: sensors.district_1.traffic.congestion_index, range: '0.1-0.5', severity: 'critical' },
+  ];
+}
+
+// ── District cards ──
+function renderCards(sensors) {
+  const grid = document.getElementById('district-grid');
+  grid.innerHTML = '';
+  for (const d of DISTRICTS) {
+    const s = sensors[d];
+    const statuses = [s.power.status, s.water.status, s.traffic.status];
+    const hasCritical = statuses.includes('critical');
+    const card = document.createElement('div');
+    card.className = 'card' + (hasCritical ? ' critical-card' : '');
+    card.innerHTML = `
+      <div class="card-title">${d.replace('_',' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+      <div class="status-row"><div class="status-dot ${s.power.status}"></div><span class="sys-label power">Power</span><span>${s.power.voltage}V</span></div>
+      <div class="status-row"><div class="status-dot ${s.water.status}"></div><span class="sys-label water">Water</span><span>${s.water.pressure_psi} PSI</span></div>
+      <div class="status-row"><div class="status-dot ${s.traffic.status}"></div><span class="sys-label traffic">Traffic</span><span>${s.traffic.congestion_index}</span></div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+// ── Alerts ──
+function renderAlerts(anomalies) {
+  const list = document.getElementById('alert-list');
+  list.innerHTML = '';
+  const sorted = [...anomalies].sort((a,b) => a.severity === 'critical' ? -1 : 1);
+  for (const a of sorted) {
+    const item = document.createElement('div');
+    item.className = 'alert-item';
+    item.innerHTML = `
+      <span class="alert-severity ${a.severity}">${a.severity}</span>
+      <span>${a.district.replace('_',' ')} — ${a.system}</span>
+      <span class="alert-detail">${a.field}: ${a.value} (normal: ${a.range})</span>
+    `;
+    list.appendChild(item);
+  }
+}
+
+// ── Charts ──
+const chartColors = ['#00d4ff','#a78bfa','#f472b6','#34d399','#fbbf24','#fb923c'];
+const chartData = { power: [], water: [], traffic: [] };
+const labels = [];
+
+function makeChart(id, label, dataKey, yLabel) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: DISTRICTS.map((d, i) => ({
+      label: d.replace('_',' '),
+      data: [],
+      borderColor: chartColors[i],
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension: 0.3
+    }))},
+    options: {
+      responsive: true,
+      animation: { duration: 300 },
+      plugins: { legend: { display: true, labels: { color: '#64748b', font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#475569', font: { size: 9 } }, grid: { color: 'rgba(30,41,59,0.5)' } },
+        y: { title: { display: true, text: yLabel, color: '#64748b', font: { size: 10 } }, ticks: { color: '#475569', font: { size: 9 } }, grid: { color: 'rgba(30,41,59,0.5)' } }
+      }
+    }
+  });
+}
+
+const charts = {};
+
+function initCharts() {
+  charts.power = makeChart('chart-power', 'Power', 'power', 'Voltage (V)');
+  charts.water = makeChart('chart-water', 'Water', 'water', 'Pressure (PSI)');
+  charts.traffic = makeChart('chart-traffic', 'Traffic', 'traffic', 'Congestion');
+}
+
+function updateCharts(sensors) {
+  const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  for (const [sysKey, chart] of Object.entries(charts)) {
+    chart.data.labels.push(now);
+    if (chart.data.labels.length > MAX_POINTS) chart.data.labels.shift();
+
+    DISTRICTS.forEach((d, i) => {
+      const val = sysKey === 'power' ? sensors[d].power.voltage
+                : sysKey === 'water' ? sensors[d].water.pressure_psi
+                : sensors[d].traffic.congestion_index;
+      chart.data.datasets[i].data.push(val);
+      if (chart.data.datasets[i].data.length > MAX_POINTS) chart.data.datasets[i].data.shift();
+    });
+
+    chart.update('none');
+  }
+}
+
+// ── Main loop ──
+function update() {
+  const sensors = generateSensors();
+  const overall = getOverall(sensors);
+  const anomalies = getAnomalies(sensors);
+
+  // Header
+  const badge = document.getElementById('overall-badge');
+  badge.textContent = overall.toUpperCase();
+  badge.className = 'overall-badge ' + overall;
+  document.getElementById('ts').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+
+  renderCards(sensors);
+  renderAlerts(anomalies);
+  updateCharts(sensors);
+}
+
+initCharts();
+update();
+setInterval(update, 5000);
+</script>
+</body>
+</html>

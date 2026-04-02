@@ -1,0 +1,19 @@
+Output ONLY a JavaScript function called generateData(). No explanation. No HTML. No markdown fences. Just the raw function.
+
+The function takes no arguments and returns an object with 6 districts.
+
+For each district (district_1 through district_6), generate:
+  power: voltage r(115,125), load_pct r(30,85), outage false, status "healthy"
+  water: pressure_psi r(45,80), flow_rate r(5,15), quality_index ri(85,100), status "healthy"
+  traffic: congestion_index r(0.1,0.5), incident_count ri(0,2), avg_speed_mph r(25,45), status "healthy"
+
+Use these helpers (already defined on the page):
+  function r(a,b) returns random float between a and b
+  function ri(a,b) returns random int between a and b
+
+Override these three districts EVERY time:
+  district_3: power.voltage = r(90,98), power.status = "warning"
+  district_5: water.pressure_psi = r(20,30), water.status = "critical"
+  district_1: traffic.congestion_index = r(0.85,0.95), traffic.avg_speed_mph = r(5,12), traffic.incident_count = ri(3,5), traffic.status = "critical"
+
+Output ONLY the function. Start with "function generateData()" and end with the closing brace. Nothing else.

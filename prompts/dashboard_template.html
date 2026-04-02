@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>City Infrastructure Health Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0f1e;color:#e0e6ed;font-family:system-ui,sans-serif;padding:20px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #1e293b}
+h1{font-size:1.6rem;color:#00d4ff}
+.badge{padding:6px 16px;border-radius:20px;font-weight:700;font-size:.85rem;text-transform:uppercase}
+.badge.healthy{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3)}
+.badge.warning{background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
+.badge.critical{background:rgba(255,51,51,.15);color:#ff3333;border:1px solid rgba(255,51,51,.3);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.ts{font-size:.75rem;color:#475569;margin-top:4px;font-family:monospace}
+.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(3,1fr)}}
+.card{background:#111827;border:1px solid #1e293b;border-radius:8px;padding:14px}
+.card.crit{border-color:rgba(255,51,51,.4);box-shadow:0 0 15px rgba(255,51,51,.1);animation:pulse 2s infinite}
+.card-title{font-size:13px;font-weight:700;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dot.healthy{background:#34d399}
+.dot.warning{background:#fbbf24;box-shadow:0 0 6px rgba(251,191,36,.5)}
+.dot.critical{background:#ff3333;box-shadow:0 0 8px rgba(255,51,51,.6);animation:pulse 1s infinite}
+.lbl{color:#475569;min-width:50px}
+.lbl.p{color:#00d4ff}.lbl.w{color:#00ffcc}.lbl.t{color:#ffaa00}
+.charts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:1200px){.charts{grid-template-columns:1fr}}
+.chart-card{background:#111827;border:1px solid #1e293b;border-radius:8px;padding:16px}
+.chart-title{font-size:13px;font-weight:700;margin-bottom:12px}
+.chart-title.p{color:#00d4ff}.chart-title.w{color:#00ffcc}.chart-title.t{color:#ffaa00}
+.alerts{background:#111827;border:1px solid #1e293b;border-radius:8px;padding:16px}
+.alerts h2{font-size:14px;color:#ff3333;margin-bottom:12px}
+.alert{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:6px;margin-bottom:6px;background:rgba(255,51,51,.04);border:1px solid rgba(255,51,51,.1);font-size:12px}
+.sev{font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;text-transform:uppercase}
+.sev.critical{background:rgba(255,51,51,.2);color:#ff3333}
+.sev.warning{background:rgba(251,191,36,.2);color:#fbbf24}
+.alert-detail{color:#475569;font-family:monospace;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+<div><h1>City Infrastructure Health Monitor</h1><div class="ts" id="ts">Last updated: --</div></div>
+<div id="badge" class="badge healthy">--</div>
+</header>
+<div class="grid" id="grid"></div>
+<div class="charts">
+<div class="chart-card"><div class="chart-title p">⚡ Power Grid — Voltage (V)</div><canvas id="c1"></canvas></div>
+<div class="chart-card"><div class="chart-title w">💧 Water Network — Pressure (PSI)</div><canvas id="c2"></canvas></div>
+<div class="chart-card"><div class="chart-title t">🚗 Traffic — Congestion Index</div><canvas id="c3"></canvas></div>
+</div>
+<div class="alerts"><h2>⚠ Active Anomaly Alerts</h2><div id="al"></div></div>
+
+<script>
+// ===== GENERATED DATA FUNCTION (injected by pipeline) =====
+%%GENERATE_DATA%%
+// ===== END GENERATED =====
+
+const DISTRICTS=['district_1','district_2','district_3','district_4','district_5','district_6'];
+const colors=['#00d4ff','#a78bfa','#f472b6','#34d399','#fbbf24','#fb923c'];
+const MAX=10;
+const hist={v:[],p:[],c:[]};
+for(let i=0;i<6;i++){hist.v.push([]);hist.p.push([]);hist.c.push([])}
+const charts={};
+
+function getOverall(d){
+let o='healthy';
+for(const k of DISTRICTS){for(const s of ['power','water','traffic']){const st=d[k][s].status;if(st==='critical')return'critical';if(st==='warning')o='warning'}}
+return o;
+}
+
+function renderCards(d){
+const g=document.getElementById('grid');g.innerHTML='';
+for(const k of DISTRICTS){
+const s=d[k],hasCrit=[s.power.status,s.water.status,s.traffic.status].includes('critical');
+const c=document.createElement('div');c.className='card'+(hasCrit?' crit':'');
+c.innerHTML=`<div class="card-title">${k.replace('_',' ').replace(/\\b\\w/g,c=>c.toUpperCase())}</div>
+<div class="row"><div class="dot ${s.power.status||'healthy'}"></div><span class="lbl p">Power</span><span>${(s.power.voltage||0).toFixed(1)}V</span></div>
+<div class="row"><div class="dot ${s.water.status||'healthy'}"></div><span class="lbl w">Water</span><span>${(s.water.pressure_psi||0).toFixed(1)} PSI</span></div>
+<div class="row"><div class="dot ${s.traffic.status||'healthy'}"></div><span class="lbl t">Traffic</span><span>${(s.traffic.congestion_index||0).toFixed(2)}</span></div>`;
+g.appendChild(c);
+}}
+
+function renderAlerts(d){
+const al=document.getElementById('al');al.innerHTML='';
+const items=[
+{d:'district_3',sys:'power',f:'voltage',v:d.district_3.power.voltage,r:'115-125V',sev:'warning'},
+{d:'district_5',sys:'water',f:'pressure_psi',v:d.district_5.water.pressure_psi,r:'45-80 PSI',sev:'critical'},
+{d:'district_1',sys:'traffic',f:'congestion_index',v:d.district_1.traffic.congestion_index,r:'0.1-0.5',sev:'critical'}
+].sort((a,b)=>a.sev==='critical'?-1:1);
+for(const a of items){
+const e=document.createElement('div');e.className='alert';
+e.innerHTML=`<span class="sev ${a.sev}">${a.sev}</span><span>${a.d.replace('_',' ')} — ${a.sys}</span><span class="alert-detail">${a.f}: ${typeof a.v==='number'?a.v.toFixed(2):a.v} (normal: ${a.r})</span>`;
+al.appendChild(e);
+}}
+
+const cfgs=[{id:'c1',key:'power',field:'voltage',h:'v',label:'Voltage(V)',min:80,max:130},{id:'c2',key:'water',field:'pressure_psi',h:'p',label:'Pressure(PSI)',min:15,max:85},{id:'c3',key:'traffic',field:'congestion_index',h:'c',label:'Congestion',min:0,max:1}];
+
+function updateCharts(d){
+const t=new Date().toLocaleTimeString('en-US',{hour12:false});
+for(const cfg of cfgs){
+for(let i=0;i<6;i++){
+hist[cfg.h][i].push(d[DISTRICTS[i]][cfg.key][cfg.field]);
+if(hist[cfg.h][i].length>MAX)hist[cfg.h][i].shift();
+}
+if(!charts[cfg.id]){
+const labels=Array(hist[cfg.h][0].length).fill('');
+charts[cfg.id]=new Chart(document.getElementById(cfg.id),{type:'line',data:{labels,datasets:DISTRICTS.map((dk,i)=>({label:dk.replace('_',' '),data:[...hist[cfg.h][i]],borderColor:colors[i],backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:.3}))},options:{responsive:true,animation:{duration:300},plugins:{legend:{labels:{color:'#64748b',font:{size:10}}}},scales:{x:{ticks:{color:'#475569',font:{size:9}},grid:{color:'rgba(30,41,59,.5)'}},y:{min:cfg.min,max:cfg.max,ticks:{color:'#475569',font:{size:9}},grid:{color:'rgba(30,41,59,.5)'}}}}});
+}else{
+const ch=charts[cfg.id];
+ch.data.labels.push(t);if(ch.data.labels.length>MAX)ch.data.labels.shift();
+DISTRICTS.forEach((_,i)=>{ch.data.datasets[i].data=[...hist[cfg.h][i]]});
+ch.update('none');
+}}}
+
+function update(){
+const d=generateData();
+const o=getOverall(d);
+document.getElementById('badge').textContent=o.toUpperCase();
+document.getElementById('badge').className='badge '+o;
+document.getElementById('ts').textContent='Last updated: '+new Date().toLocaleTimeString();
+renderCards(d);renderAlerts(d);updateCharts(d);
+}
+update();setInterval(update,5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+Output ONLY a Python code block. Start with ```python end with ```. No explanation.
+
+Complete this script. Fill in the THREE sections marked TODO. Everything else is already written. Do NOT modify the existing code. Do NOT add Pydantic models. Keep it short.
+
+```python
+import random
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+DISTRICTS = ["district_1","district_2","district_3","district_4","district_5","district_6"]
+
+def generate_sensors():
+    data = {{}}
+    for d in DISTRICTS:
+        power = {{"voltage": round(random.uniform(115,125),1), "load_pct": round(random.uniform(30,85),1), "outage": False, "status": "healthy"}}
+        water = {{"pressure_psi": round(random.uniform(45,80),1), "flow_rate": round(random.uniform(5,15),1), "quality_index": random.randint(85,100), "status": "healthy"}}
+        traffic = {{"congestion_index": round(random.uniform(0.1,0.5),2), "incident_count": random.randint(0,2), "avg_speed_mph": round(random.uniform(25,45),1), "status": "healthy"}}
+        if d == "district_3":
+            power["voltage"] = round(random.uniform(90,98),1)
+            power["status"] = "warning"
+        elif d == "district_5":
+            water["pressure_psi"] = round(random.uniform(20,30),1)
+            water["status"] = "critical"
+        elif d == "district_1":
+            traffic["congestion_index"] = round(random.uniform(0.85,0.95),2)
+            traffic["avg_speed_mph"] = round(random.uniform(5,12),1)
+            traffic["incident_count"] = random.randint(3,5)
+            traffic["status"] = "critical"
+        data[d] = {{"power": power, "water": water, "traffic": traffic}}
+    return data
+
+@app.get("/api/health")
+def health():
+    # TODO: Call generate_sensors(). Loop over districts. Build overall status
+    # (critical > warning > healthy) and per-district status dict.
+    # Return {{"overall": str, "districts": {{d: {{"power": s, "water": s, "traffic": s}}}}}}
+    pass
+
+@app.get("/api/sensors")
+def sensors():
+    return generate_sensors()
+
+@app.get("/api/anomalies")
+def anomalies():
+    s = generate_sensors()
+    return {{"anomalies": [
+        {{"district":"district_3","system":"power","field":"voltage","current_value":s["district_3"]["power"]["voltage"],"normal_range":"115-125V","severity":"warning"}},
+        {{"district":"district_5","system":"water","field":"pressure_psi","current_value":s["district_5"]["water"]["pressure_psi"],"normal_range":"45-80PSI","severity":"critical"}},
+        {{"district":"district_1","system":"traffic","field":"congestion_index","current_value":s["district_1"]["traffic"]["congestion_index"],"normal_range":"0.1-0.5","severity":"critical"}}
+    ]}}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+```
+
+Fill in ONLY the health() TODO. The sensors() and anomalies() endpoints are already complete — do NOT rewrite them. Output the complete script as one code block.

@@ -1,0 +1,22 @@
+Output ONLY a single Python code block. No explanation. No commentary.
+Start with ```python and end with ```.
+
+Your previous code had errors. Fix them. Return the COMPLETE corrected script, not just the fix.
+
+ERRORS TO FIX:
+{error}
+
+RULES — same as before:
+- Use only: fastapi, uvicorn, random, datetime, math
+- CORS enabled for all origins
+- End with: if __name__ == "__main__": uvicorn.run(app, host="0.0.0.0", port=8000)
+- Under 120 lines. Loop over districts. No separate dicts per district.
+- ALL THREE endpoints must be present: /api/health, /api/sensors, /api/anomalies
+- Anomalies ALWAYS active: district_3 power voltage 90-98, district_5 water pressure 20-30, district_1 traffic congestion 0.85-0.95
+- Normal ranges: voltage 115-125, pressure 45-80, congestion 0.1-0.5
+- Generate fresh random data on every call
+
+PLAN FOR REFERENCE:
+{plan}
+
+Output ONLY the complete corrected code block. Nothing else.
